@@ -2,18 +2,14 @@ import type { NextConfig } from 'next';
 import path from 'path';
 
 const nextConfig: NextConfig = {
-  // outputFileTracingRoot: path.resolve(__dirname, '../../'),
-  /* config options here */
-  allowedDevOrigins: ['*.dev.coze.site'],
+  // 静态导出配置
+  output: 'export',
+  // 禁用图片优化（静态导出不支持）
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'lf-coze-web-cdn.coze.cn',
-        pathname: '/**',
-      },
-    ],
+    unoptimized: true,
   },
+  // 移除 Server Components 的限制
+  trailingSlash: true,
 };
 
 export default nextConfig;

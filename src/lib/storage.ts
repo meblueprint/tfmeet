@@ -60,7 +60,7 @@ class LocalStorage {
 
   // ============ 用户管理 ============
   getUsers(): User[] {
-    return this.get<User[]>(STORAGE_KEYS.USERS) || [];
+    return this.get(STORAGE_KEYS.USERS) || [];
   }
 
   saveUsers(users: User[]): void {
@@ -107,7 +107,7 @@ class LocalStorage {
 
   // ============ 运动会信息 ============
   getMeetInfo(): MeetInfo | null {
-    const infos = this.get(STORAGE_KEYS.MEET_INFO);
+    const infos = this.get(STORAGE_KEYS.MEET_INFO) as MeetInfo[];
     return infos && infos.length > 0 ? infos[0] : null;
   }
 
@@ -117,7 +117,7 @@ class LocalStorage {
 
   // ============ 班级管理 ============
   getClasses(): Class[] {
-    return this.get<Class[]>(STORAGE_KEYS.CLASSES) || [];
+    return (this.get(STORAGE_KEYS.CLASSES) || []) as Class[];
   }
 
   saveClasses(classes: Class[]): void {
@@ -151,7 +151,7 @@ class LocalStorage {
 
   // ============ 项目管理 ============
   getEvents(): Event[] {
-    return this.get<Event[]>(STORAGE_KEYS.EVENTS) || [];
+    return (this.get(STORAGE_KEYS.EVENTS) || []) as Event[];
   }
 
   saveEvents(events: Event[]): void {
@@ -185,7 +185,7 @@ class LocalStorage {
 
   // ============ 学生管理 ============
   getStudents(): Student[] {
-    return this.get<Student[]>(STORAGE_KEYS.STUDENTS) || [];
+    return (this.get(STORAGE_KEYS.STUDENTS) || []) as Student[];
   }
 
   saveStudents(students: Student[]): void {
@@ -223,7 +223,7 @@ class LocalStorage {
 
   // ============ 报名管理 ============
   getRegistrations(): Registration[] {
-    return this.get<Registration[]>(STORAGE_KEYS.REGISTRATIONS) || [];
+    return (this.get(STORAGE_KEYS.REGISTRATIONS) || []) as Registration[];
   }
 
   saveRegistrations(registrations: Registration[]): void {
@@ -269,7 +269,7 @@ class LocalStorage {
 
   // ============ 赛程管理 ============
   getSchedules(): Schedule[] {
-    return this.get<Schedule[]>(STORAGE_KEYS.SCHEDULES) || [];
+    return (this.get(STORAGE_KEYS.SCHEDULES) || []) as Schedule[];
   }
 
   saveSchedules(schedules: Schedule[]): void {
@@ -303,7 +303,7 @@ class LocalStorage {
 
   // ============ 成绩管理 ============
   getResults(): Result[] {
-    return this.get<Result[]>(STORAGE_KEYS.RESULTS) || [];
+    return (this.get(STORAGE_KEYS.RESULTS) || []) as Result[];
   }
 
   saveResults(results: Result[]): void {
@@ -349,7 +349,7 @@ class LocalStorage {
 
   // ============ 奖状模板管理 ============
   getCertificateTemplates(): CertificateTemplate[] {
-    return this.get<CertificateTemplate[]>(STORAGE_KEYS.CERTIFICATE_TEMPLATES) || [];
+    return (this.get(STORAGE_KEYS.CERTIFICATE_TEMPLATES) || []) as CertificateTemplate[];
   }
 
   saveCertificateTemplates(templates: CertificateTemplate[]): void {
@@ -383,7 +383,7 @@ class LocalStorage {
 
   // ============ 奖状管理 ============
   getCertificates(): Certificate[] {
-    return this.get<Certificate[]>(STORAGE_KEYS.CERTIFICATES) || [];
+    return (this.get(STORAGE_KEYS.CERTIFICATES) || []) as Certificate[];
   }
 
   saveCertificates(certificates: Certificate[]): void {
@@ -420,7 +420,7 @@ class LocalStorage {
 
   // ============ 操作日志 ============
   getLogs(): OperationLog[] {
-    return this.get<OperationLog[]>(STORAGE_KEYS.LOGS) || [];
+    return (this.get(STORAGE_KEYS.LOGS) || []) as OperationLog[];
   }
 
   saveLogs(logs: OperationLog[]): void {

@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
   },
   // 移除 Server Components 的限制
   trailingSlash: true,
+  // 设置基础路径
+  basePath: '/tfmeet',
+  // 确保资源路径也包含 basePath
+  assetPrefix: '/tfmeet',
 };
 
 export default nextConfig;

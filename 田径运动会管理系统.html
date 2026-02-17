@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>田径运动会管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in; }
+        .animate-slide-in { animation: slideIn 0.3s ease-out; }
+        
+        /* Glass Effect */
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        
+        /* Gradient Background */
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        
+        /* Card Hover */
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-5px); box-shadow: 0 10px 40px rgba(0,0,0,0.15); }
+        
+        /* Status Colors */
+        .status-pending { background: #ffc107; color: #856404; }
+        .status-approved { background: #28a745; color: white; }
+        .status-rejected { background: #dc3545; color: white; }
+        .status-scheduled { background: #17a2b8; color: white; }
+        .status-completed { background: #28a745; color: white; }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script>
+        // ============================================
+        // 数据存储层 (localStorage)
+        // ============================================
+        const Storage = {
+            KEYS: {
+                USERS: 'athletic_meet_users',
+                EVENTS: 'athletic_meet_events',
+                REGISTRATIONS: 'athletic_meet_registrations',
+                SCHEDULES: 'athletic_meet_schedules',
+                RESULTS: 'athletic_meet_results',
+                SETTINGS: 'athletic_meet_settings',
+                CERTIFICATES: 'athletic_meet_certificates'
+            },
+
+            get(key) {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : null;
+            },
+
+            set(key, value) {
+                localStorage.setItem(key, JSON.stringify(value));
+            },
+
+            init() {
+                // 初始化默认数据
+                if (!this.get(this.KEYS.USERS)) {
+                    this.set(this.KEYS.USERS, this.getDefaultUsers());
+                }
+                if (!this.get(this.KEYS.EVENTS)) {
+                    this.set(this.KEYS.EVENTS, this.getDefaultEvents());
+                }
+                if (!this.get(this.KEYS.SETTINGS)) {
+                    this.set(this.KEYS.SETTINGS, this.getDefaultSettings());
+                }
+                if (!this.get(this.KEYS.REGISTRATIONS)) {
+                    this.set(this.KEYS.REGISTRATIONS, []);
+                }
+                if (!this.get(this.KEYS.SCHEDULES)) {
+                    this.set(this.KEYS.SCHEDULES, []);
+                }
+                if (!this.get(this.KEYS.RESULTS)) {
+                    this.set(this.KEYS.RESULTS, []);
+                }
+                if (!this.get(this.KEYS.CERTIFICATES)) {
+                    this.set(this.KEYS.CERTIFICATES, []);
+                }
+            },
+
+            getDefaultUsers() {
+                return [
+                    { id: 1, username: 'admin', password: 'admin123', name: '超级管理员', role: 'admin', className: '系统管理' },
+                    { id: 2, username: 'teacher', password: 'teacher123', name: '张老师', role: 'teacher', className: '高一1班' },
+                    { id: 3, username: 'teacher2', password: 'teacher123', name: '李老师', role: 'teacher', className: '高一2班' },
+                    { id: 4, username: 'student', password: 'student123', name: '王小明', role: 'student', className: '高一1班', studentId: 'S001' },
+                    { id: 5, username: 'student2', password: 'student123', name: '李华', role: 'student', className: '高一1班', studentId: 'S002' },
+                    { id: 6, username: 'student3', password: 'student123', name: '张伟', role: 'student', className: '高一2班', studentId: 'S003' }
+                ];
+            },
+
+            getDefaultEvents() {
+                return [
+                    { id: 1, name: '100米短跑', type: 'track', gender: 'male', maxParticipants: 8 },
+                    { id: 2, name: '200米短跑', type: 'track', gender: 'male', maxParticipants: 8 },
+                    { id: 3, name: '400米短跑', type: 'track', gender: 'male', maxParticipants: 8 },
+                    { id: 4, name: '跳远', type: 'field', gender: 'male', maxParticipants: 12 },
+                    { id: 5, name: '跳高', type: 'field', gender: 'male', maxParticipants: 12 },
+                    { id: 6, name: '铅球', type: 'field', gender: 'male', maxParticipants: 12 },
+                    { id: 7, name: '4x100米接力', type: 'relay', gender: 'male', maxParticipants: 16, teamSize: 4 }
+                ];
+            },
+
+            getDefaultSettings() {
+                return {
+                    meetName: '第十届春季田径运动会',
+                    meetDate: '2025-04-15',
+                    schoolName: '实验中学',
+                    location: '学校操场',
+                    status: 'preparing'
+                };
+            }
+        };
+
+        // ============================================
+        // 状态管理
+        // ============================================
+        const AppState = {
+            currentUser: null,
+            currentView: 'login',
+            
+            // 导航到指定视图
+            navigate(view) {
+                this.currentView = view;
+                App.render();
+            },
+
+            // 登录
+            login(username, password) {
+                const users = Storage.get(Storage.KEYS.USERS);
+                const user = users.find(u => u.username === username && u.password === password);
+                if (user) {
+                    this.currentUser = user;
+                    this.navigate('dashboard');
+                    return true;
+                }
+                return false;
+            },
+
+            // 登出
+            logout() {
+                this.currentUser = null;
+                this.navigate('login');
+            },
+
+            // 检查权限
+            hasPermission(requiredRole) {
+                if (!this.currentUser) return false;
+                if (this.currentUser.role === 'admin') return true;
+                if (requiredRole === 'student' && this.currentUser.role === 'student') return true;
+                if (requiredRole === 'teacher' && this.currentUser.role === 'teacher') return true;
+                if (requiredRole === 'teacher' && this.currentUser.role === 'admin') return true;
+                return false;
+            }
+        };
+
+        // ============================================
+        // 工具函数
+        // ============================================
+        const Utils = {
+            formatDate(dateStr) {
+                return new Date(dateStr).toLocaleDateString('zh-CN');
+            },
+
+            generateId() {
+                return Date.now() + Math.random();
+            },
+
+            showToast(message, type = 'success') {
+                const toast = document.createElement('div');
+                toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 animate-slide-in ${
+                    type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                } text-white`;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+        };
+
+        // ============================================
+        // 页面组件
+        // ============================================
+        const Components = {
+            // 登录页面
+            LoginPage: () => `
+                <div class="min-h-screen gradient-bg flex items-center justify-center p-4">
+                    <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md animate-fade-in">
+                        <div class="text-center mb-8">
+                            <div class="text-6xl mb-4">🏆</div>
+                            <h1 class="text-3xl font-bold text-gray-800 mb-2">田径运动会管理系统</h1>
+                            <p class="text-gray-600">请登录您的账户</p>
+                        </div>
+                        
+                        <form id="loginForm" class="space-y-6">
+                            <div>
+                                <label class="block text-gray-700 mb-2 font-medium">用户名</label>
+                                <input type="text" id="username" 
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                                    placeholder="请输入用户名" required>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-gray-700 mb-2 font-medium">密码</label>
+                                <input type="password" id="password"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                                    placeholder="请输入密码" required>
+                            </div>
+                            
+                            <button type="submit"
+                                class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition transform hover:scale-[1.02]">
+                                登录
+                            </button>
+                        </form>
+                        
+                        <div class="mt-8 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <p class="text-sm text-yellow-800 font-medium mb-2">💡 演示账户：</p>
+                            <p class="text-xs text-gray-600">管理员: admin / admin123</p>
+                            <p class="text-xs text-gray-600">老师: teacher / teacher123</p>
+                            <p class="text-xs text-gray-600">学生: student / student123</p>
+                        </div>
+                    </div>
+                </div>
+            `,
+
+            // 主布局
+            Layout: (content) => `
+                <div class="min-h-screen bg-gray-100">
+                    <!-- 顶部导航 -->
+                    <nav class="gradient-bg text-white shadow-lg">
+                        <div class="max-w-7xl mx-auto px-4 py-4">
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center space-x-4">
+                                    <span class="text-3xl">🏆</span>
+                                    <div>
+                                        <h1 class="text-xl font-bold">${Storage.get(Storage.KEYS.SETTINGS).meetName}</h1>
+                                        <p class="text-sm opacity-80">${Storage.get(Storage.KEYS.SETTINGS).schoolName}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-center space-x-4">
+                                    <span class="text-sm">
+                                        <i class="fas fa-user mr-2"></i>
+                                        ${AppState.currentUser?.name} (${AppState.currentUser?.role === 'admin' ? '管理员' : AppState.currentUser?.role === 'teacher' ? '老师' : '学生'})
+                                    </span>
+                                    <button onclick="AppState.logout()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition">
+                                        <i class="fas fa-sign-out-alt mr-2"></i>退出
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <div class="flex">
+                        <!-- 侧边栏 -->
+                        <aside class="w-64 bg-white shadow-lg min-h-screen">
+                            <nav class="p-4 space-y-2">
+                                <button onclick="AppState.navigate('dashboard')" 
+                                    class="w-full text-left px-4 py-3 rounded-lg hover:bg-purple-50 transition flex items-center ${AppState.currentView === 'dashboard' ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}">
+                                    <i class="fas fa-home w-6"></i> 仪表盘
+                                </button>
+                                
+                                ${AppState.hasPermission('teacher') ? `
+                                <button onclick="AppState.navigate('registrations')"
+                                    class="w-full text-left px-4 py-3 rounded-lg hover:bg-purple-50 transition flex items-center ${AppState.currentView === 'registrations' ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}">
+                                    <i class="fas fa-user-plus w-6"></i> 报名管理
+                                </button>
+                                ` : ''}
+                                
+                                ${AppState.hasPermission('teacher') ? `
+                                <button onclick="AppState.navigate('schedules')"
+                                    class="w-full text-left px-4 py-3 rounded-lg hover:bg-purple-50 transition flex items-center ${AppState.currentView === 'schedules' ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}">
+                                    <i class="fas fa-calendar w-6"></i> 赛程管理
+                                </button>
+                                ` : ''}
+                                
+                                ${AppState.hasPermission('teacher') ? `
+                                <button onclick="AppState.navigate('results')"
+                                    class="w-full text-left px-4 py-3 rounded-lg hover:bg-purple-50 transition flex items-center ${AppState.currentView === 'results' ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}">
+                                    <i class="fas fa-medal w-6"></i> 成绩录入
+                                </button>
+                                ` : ''}
+                                
+                                ${AppState.hasPermission('teacher') ? `
+                                <button onclick="AppState.navigate('certificates')"
+                                    class="w-full text-left px-4 py-3 rounded-lg hover:bg-purple-50 transition flex items-center ${AppState.currentView === 'certificates' ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}">
+                                    <i class="fas fa-certificate w-6"></i> 奖状生成
+                                </button>
+                                ` : ''}
+                                
+                                <button onclick="AppState.navigate('statistics')"
+                                    class="w-full text-left px-4 py-3 rounded-lg hover:bg-purple-50 transition flex items-center ${AppState.currentView === 'statistics' ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}">
+                                    <i class="fas fa-chart-bar w-6"></i> 数据统计
+                                </button>
+                                
+                                ${AppState.currentUser?.role === 'admin' ? `
+                                <button onclick="AppState.navigate('settings')"
+                                    class="w-full text-left px-4 py-3 rounded-lg hover:bg-purple-50 transition flex items-center ${AppState.currentView === 'settings' ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}">
+                                    <i class="fas fa-cog w-6"></i> 系统设置
+                                </button>
+                                ` : ''}
+                                
+                                ${AppState.currentUser?.role === 'admin' ? `
+                                <button onclick="AppState.navigate('users')"
+                                    class="w-full text-left px-4 py-3 rounded-lg hover:bg-purple-50 transition flex items-center ${AppState.currentView === 'users' ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}">
+                                    <i class="fas fa-users w-6"></i> 用户管理
+                                </button>
+                                ` : ''}
+                            </nav>
+                        </aside>
+
+                        <!-- 主内容区 -->
+                        <main class="flex-1 p-6">
+                            ${content}
+                        </main>
+                    </div>
+                </div>
+            `,
+
+            // 仪表盘
+            DashboardPage: () => {
+                const settings = Storage.get(Storage.KEYS.SETTINGS);
+                const users = Storage.get(Storage.KEYS.USERS);
+                const events = Storage.get(Storage.KEYS.EVENTS);
+                const registrations = Storage.get(Storage.KEYS.REGISTRATIONS);
+                const schedules = Storage.get(Storage.KEYS.SCHEDULES);
+                const results = Storage.get(Storage.KEYS.RESULTS);
+
+                const studentCount = users.filter(u => u.role === 'student').length;
+                const classCount = [...new Set(users.filter(u => u.role === 'student').map(u => u.className))].length;
+                const pendingRegistrations = registrations.filter(r => r.status === 'pending').length;
+
+                return `
+                    <div class="animate-fade-in">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">仪表盘</h2>
+                        
+                        <!-- 统计卡片 -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                            <div class="bg-white rounded-xl shadow-md p-6 card-hover">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-gray-500 text-sm">学生总数</p>
+                                        <p class="text-3xl font-bold text-gray-800">${studentCount}</p>
+                                    </div>
+                                    <div class="text-4xl">👨‍🎓</div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white rounded-xl shadow-md p-6 card-hover">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-gray-500 text-sm">班级数量</p>
+                                        <p class="text-3xl font-bold text-gray-800">${classCount}</p>
+                                    </div>
+                                    <div class="text-4xl">🏫</div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white rounded-xl shadow-md p-6 card-hover">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-gray-500 text-sm">比赛项目</p>
+                                        <p class="text-3xl font-bold text-gray-800">${events.length}</p>
+                                    </div>
+                                    <div class="text-4xl">🏃</div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white rounded-xl shadow-md p-6 card-hover">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-gray-500 text-sm">待审核报名</p>
+                                        <p class="text-3xl font-bold text-orange-500">${pendingRegistrations}</p>
+                                    </div>
+                                    <div class="text-4xl">📋</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 运动会信息 -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="bg-white rounded-xl shadow-md p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">📅 运动会信息</h3>
+                                <div class="space-y-3">
+                                    <div class="flex justify-between items-center py-2 border-b">
+                                        <span class="text-gray-600">运动会名称</span>
+                                        <span class="font-medium">${settings.meetName}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-2 border-b">
+                                        <span class="text-gray-600">举办学校</span>
+                                        <span class="font-medium">${settings.schoolName}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-2 border-b">
+                                        <span class="text-gray-600">举办日期</span>
+                                        <span class="font-medium">${Utils.formatDate(settings.meetDate)}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-2">
+                                        <span class="text-gray-600">举办地点</span>
+                                        <span class="font-medium">${settings.location}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white rounded-xl shadow-md p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">⚡ 快速操作</h3>
+                                <div class="grid grid-cols-2 gap-4">
+                                    ${AppState.hasPermission('teacher') ? `
+                                    <button onclick="AppState.navigate('registrations')" 
+                                        class="p-4 bg-purple-50 hover:bg-purple-100 rounded-lg text-center transition">
+                                        <div class="text-3xl mb-2">📋</div>
+                                        <p class="text-sm font-medium text-gray-700">报名管理</p>
+                                    </button>
+                                    <button onclick="AppState.navigate('schedules')"
+                                        class="p-4 bg-blue-50 hover:bg-blue-100 rounded-lg text-center transition">
+                                        <div class="text-3xl mb-2">📅</div>
+                                        <p class="text-sm font-medium text-gray-700">赛程管理</p>
+                                    </button>
+                                    ` : ''}
+                                    ${AppState.hasPermission('teacher') ? `
+                                    <button onclick="AppState.navigate('results')"
+                                        class="p-4 bg-green-50 hover:bg-green-100 rounded-lg text-center transition">
+                                        <div class="text-3xl mb-2">🏆</div>
+                                        <p class="text-sm font-medium text-gray-700">成绩录入</p>
+                                    </button>
+                                    <button onclick="AppState.navigate('certificates')"
+                                        class="p-4 bg-yellow-50 hover:bg-yellow-100 rounded-lg text-center transition">
+                                        <div class="text-3xl mb-2">📜</div>
+                                        <p class="text-sm font-medium text-gray-700">奖状生成</p>
+                                    </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // 报名管理页面
+            RegistrationsPage: () => {
+                const users = Storage.get(Storage.KEYS.USERS);
+                const events = Storage.get(Storage.KEYS.EVENTS);
+                const registrations = Storage.get(Storage.KEYS.REGISTRATIONS);
+
+                const studentUsers = users.filter(u => u.role === 'student');
+                const myRegistrations = registrations.filter(r => 
+                    AppState.currentUser.role === 'student' 
+                        ? r.studentId === AppState.currentUser.studentId
+                        : true
+                );
+
+                return `
+                    <div class="animate-fade-in">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">报名管理</h2>
+                            <button onclick="App.showAddRegistrationModal()" 
+                                class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition flex items-center">
+                                <i class="fas fa-plus mr-2"></i>新增报名
+                            </button>
+                        </div>
+
+                        <!-- 报名统计 -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                                <p class="text-sm text-yellow-800">待审核</p>
+                                <p class="text-2xl font-bold text-yellow-600">${myRegistrations.filter(r => r.status === 'pending').length}</p>
+                            </div>
+                            <div class="bg-green-50 rounded-lg p-4 border border-green-200">
+                                <p class="text-sm text-green-800">已通过</p>
+                                <p class="text-2xl font-bold text-green-600">${myRegistrations.filter(r => r.status === 'approved').length}</p>
+                            </div>
+                            <div class="bg-red-50 rounded-lg p-4 border border-red-200">
+                                <p class="text-sm text-red-800">已拒绝</p>
+                                <p class="text-2xl font-bold text-red-600">${myRegistrations.filter(r => r.status === 'rejected').length}</p>
+                            </div>
+                        </div>
+
+                        <!-- 报名列表 -->
+                        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                            <table class="w-full">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">学生</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">班级</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">项目</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    ${myRegistrations.length === 0 ? `
+                                        <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">暂无报名记录</td></tr>
+                                    ` : myRegistrations.map(reg => {
+                                        const student = studentUsers.find(u => u.studentId === reg.studentId);
+                                        const event = events.find(e => e.id === reg.eventId);
+                                        const statusClass = {
+                                            pending: 'status-pending',
+                                            approved: 'status-approved',
+                                            rejected: 'status-rejected'
+                                        }[reg.status];
+                                        const statusText = {
+                                            pending: '待审核',
+                                            approved: '已通过',
+                                            rejected: '已拒绝'
+                                        }[reg.status];
+                                        return `
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student?.name || '未知'}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student?.className || '未知'}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${event?.name || '未知'}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <span class="px-2 py-1 rounded-full text-xs font-medium ${statusClass}">${statusText}</span>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                                    ${AppState.currentUser.role === 'teacher' && reg.status === 'pending' ? `
+                                                        <button onclick="App.approveRegistration(${reg.id})" class="text-green-600 hover:text-green-900 mr-3">
+                                                            <i class="fas fa-check"></i>
+                                                        </button>
+                                                        <button onclick="App.rejectRegistration(${reg.id})" class="text-red-600 hover:text-red-900">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    ` : ''}
+                                                    <button onclick="App.deleteRegistration(${reg.id})" class="text-red-600 hover:text-red-900 ml-3">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // 赛程管理页面
+            SchedulesPage: () => {
+                const schedules = Storage.get(Storage.KEYS.SCHEDULES);
+                const events = Storage.get(Storage.KEYS.EVENTS);
+
+                return `
+                    <div class="animate-fade-in">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">赛程管理</h2>
+                            <button onclick="App.showAddScheduleModal()"
+                                class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition flex items-center">
+                                <i class="fas fa-plus mr-2"></i>新增赛程
+                            </button>
+                        </div>
+
+                        <!-- 赛程列表 -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            ${schedules.length === 0 ? `
+                                <div class="col-span-full text-center py-12 text-gray-500">
+                                    <div class="text-6xl mb-4">📅</div>
+                                    <p>暂无赛程安排</p>
+                                    <p class="text-sm mt-2">点击"新增赛程"开始安排比赛</p>
+                                </div>
+                            ` : schedules.map(schedule => {
+                                const event = events.find(e => e.id === schedule.eventId);
+                                const statusClass = {
+                                    scheduled: 'status-scheduled',
+                                    completed: 'status-completed'
+                                }[schedule.status];
+                                const statusText = {
+                                    scheduled: '已安排',
+                                    completed: '已完成'
+                                }[schedule.status];
+                                return `
+                                    <div class="bg-white rounded-xl shadow-md p-6 card-hover">
+                                        <div class="flex justify-between items-start mb-4">
+                                            <h3 class="font-semibold text-lg text-gray-800">${event?.name || '未知项目'}</h3>
+                                            <span class="px-2 py-1 rounded-full text-xs font-medium ${statusClass}">${statusText}</span>
+                                        </div>
+                                        <div class="space-y-2 text-sm text-gray-600">
+                                            <p><i class="fas fa-calendar w-5"></i> ${schedule.date}</p>
+                                            <p><i class="fas fa-clock w-5"></i> ${schedule.time}</p>
+                                            <p><i class="fas fa-map-marker-alt w-5"></i> ${schedule.location}</p>
+                                        </div>
+                                        <div class="mt-4 pt-4 border-t flex justify-end space-x-2">
+                                            ${schedule.status === 'scheduled' ? `
+                                                <button onclick="App.completeSchedule(${schedule.id})" 
+                                                    class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition">
+                                                    完成
+                                                </button>
+                                            ` : ''}
+                                            <button onclick="App.deleteSchedule(${schedule.id})" 
+                                                class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition">
+                                                删除
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            },
+
+            // 成绩录入页面
+            ResultsPage: () => {
+                const results = Storage.get(Storage.KEYS.RESULTS);
+                const users = Storage.get(Storage.KEYS.USERS);
+                const events = Storage.get(Storage.KEYS.EVENTS);
+                const schedules = Storage.get(Storage.KEYS.SCHEDULES);
+
+                const studentUsers = users.filter(u => u.role === 'student');
+
+                return `
+                    <div class="animate-fade-in">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">成绩录入</h2>
+                            <button onclick="App.showAddResultModal()"
+                                class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition flex items-center">
+                                <i class="fas fa-plus mr-2"></i>录入成绩
+                            </button>
+                        </div>
+
+                        <!-- 成绩列表 -->
+                        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                            <table class="w-full">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">排名</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学生</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">班级</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">项目</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">成绩</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">积分</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    ${results.length === 0 ? `
+                                        <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">暂无成绩记录</td></tr>
+                                    ` : results.sort((a, b) => a.rank - b.rank).map(result => {
+                                        const student = studentUsers.find(u => u.studentId === result.studentId);
+                                        const event = events.find(e => e.id === result.eventId);
+                                        const rankIcon = result.rank === 1 ? '🥇' : result.rank === 2 ? '🥈' : result.rank === 3 ? '🥉' : result.rank;
+                                        return `
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${rankIcon} ${result.rank}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student?.name || '未知'}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student?.className || '未知'}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${event?.name || '未知'}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-purple-600">${result.score}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">${result.points}分</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                                    <button onclick="App.deleteResult(${result.id})" class="text-red-600 hover:text-red-900">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // 奖状生成页面
+            CertificatesPage: () => {
+                const results = Storage.get(Storage.KEYS.RESULTS);
+                const users = Storage.get(Storage.KEYS.USERS);
+                const events = Storage.get(Storage.KEYS.EVENTS);
+                const settings = Storage.get(Storage.KEYS.SETTINGS);
+
+                const studentUsers = users.filter(u => u.role === 'student');
+
+                return `
+                    <div class="animate-fade-in">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">奖状生成</h2>
+                            <button onclick="App.generateAllCertificates()"
+                                class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition flex items-center">
+                                <i class="fas fa-file-pdf mr-2"></i>批量生成奖状
+                            </button>
+                        </div>
+
+                        <!-- 获奖学生列表 -->
+                        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                            <table class="w-full">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">奖项</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学生</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">班级</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">项目</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    ${results.length === 0 ? `
+                                        <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">暂无获奖记录</td></tr>
+                                    ` : results.filter(r => r.rank <= 3).map(result => {
+                                        const student = studentUsers.find(u => u.studentId === result.studentId);
+                                        const event = events.find(e => e.id === result.eventId);
+                                        const awardName = result.rank === 1 ? '一等奖' : result.rank === 2 ? '二等奖' : '三等奖';
+                                        const awardColor = result.rank === 1 ? 'bg-yellow-100 text-yellow-800' : result.rank === 2 ? 'bg-gray-100 text-gray-800' : 'bg-orange-100 text-orange-800';
+                                        return `
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <span class="px-3 py-1 rounded-full text-sm font-medium ${awardColor}">
+                                                        ${result.rank === 1 ? '🥇' : result.rank === 2 ? '🥈' : '🥉'} ${awardName}
+                                                    </span>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student?.name || '未知'}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student?.className || '未知'}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${event?.name || '未知'}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                                    <button onclick="App.previewCertificate(${result.id})"
+                                                        class="text-purple-600 hover:text-purple-900 mr-3">
+                                                        <i class="fas fa-eye"></i> 预览
+                                                    </button>
+                                                    <button onclick="App.printCertificate(${result.id})"
+                                                        class="text-green-600 hover:text-green-900">
+                                                        <i class="fas fa-print"></i> 打印
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // 数据统计页面
+            StatisticsPage: () => {
+                const users = Storage.get(Storage.KEYS.USERS);
+                const results = Storage.get(Storage.KEYS.RESULTS);
+
+                // 计算班级积分
+                const classPoints = {};
+                users.filter(u => u.role === 'student').forEach(student => {
+                    const studentResults = results.filter(r => r.studentId === student.studentId);
+                    studentResults.forEach(result => {
+                        if (!classPoints[student.className]) {
+                            classPoints[student.className] = 0;
+                        }
+                        classPoints[student.className] += result.points;
+                    });
+                });
+
+                const classRankings = Object.entries(classPoints)
+                    .map(([className, points]) => ({ className, points }))
+                    .sort((a, b) => b.points - a.points);
+
+                return `
+                    <div class="animate-fade-in">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">数据统计</h2>
+
+                        <!-- 班级排名 -->
+                        <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">🏆 班级积分排名</h3>
+                            ${classRankings.length === 0 ? `
+                                <p class="text-gray-500 text-center py-8">暂无积分数据</p>
+                            ` : `
+                                <div class="space-y-3">
+                                    ${classRankings.map((item, index) => `
+                                        <div class="flex items-center justify-between p-4 ${index === 0 ? 'bg-yellow-50 border border-yellow-200' : index === 1 ? 'bg-gray-50 border border-gray-200' : index === 2 ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50'} rounded-lg">
+                                            <div class="flex items-center">
+                                                <span class="w-8 h-8 flex items-center justify-center rounded-full ${index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : index === 2 ? 'bg-orange-400' : 'bg-gray-300'} text-white font-bold mr-3">
+                                                    ${index + 1}
+                                                </span>
+                                                <span class="font-medium text-gray-800">${item.className}</span>
+                                            </div>
+                                            <span class="text-2xl font-bold text-purple-600">${item.points}分</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            `}
+                        </div>
+
+                        <!-- 统计卡片 -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="bg-white rounded-xl shadow-md p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-2">🥇 金牌数</h3>
+                                <p class="text-4xl font-bold text-yellow-500">${results.filter(r => r.rank === 1).length}</p>
+                            </div>
+                            <div class="bg-white rounded-xl shadow-md p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-2">🥈 银牌数</h3>
+                                <p class="text-4xl font-bold text-gray-400">${results.filter(r => r.rank === 2).length}</p>
+                            </div>
+                            <div class="bg-white rounded-xl shadow-md p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-2">🥉 铜牌数</h3>
+                                <p class="text-4xl font-bold text-orange-400">${results.filter(r => r.rank === 3).length}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // 用户管理页面（仅管理员）
+            UsersPage: () => {
+                const users = Storage.get(Storage.KEYS.USERS);
+
+                return `
+                    <div class="animate-fade-in">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">用户管理</h2>
+                            <button onclick="App.showAddUserModal()"
+                                class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition flex items-center">
+                                <i class="fas fa-plus mr-2"></i>添加用户
+                            </button>
+                        </div>
+
+                        <!-- 用户列表 -->
+                        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                            <table class="w-full">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">用户名</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">姓名</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">角色</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">班级</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    ${users.map(user => `
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${user.username}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${user.name}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                                                    user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                                                    user.role === 'teacher' ? 'bg-blue-100 text-blue-800' :
+                                                    'bg-green-100 text-green-800'
+                                                }">
+                                                    ${user.role === 'admin' ? '管理员' : user.role === 'teacher' ? '老师' : '学生'}
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${user.className || '-'}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                                <button onclick="App.deleteUser(${user.id})" class="text-red-600 hover:text-red-900 ${user.username === 'admin' ? 'hidden' : ''}">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // 系统设置页面（仅管理员）
+            SettingsPage: () => {
+                const settings = Storage.get(Storage.KEYS.SETTINGS);
+
+                return `
+                    <div class="animate-fade-in">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">系统设置</h2>
+
+                        <div class="bg-white rounded-xl shadow-md p-6">
+                            <form id="settingsForm" class="space-y-6">
+                                <div>
+                                    <label class="block text-gray-700 mb-2 font-medium">运动会名称</label>
+                                    <input type="text" id="meetName" value="${settings.meetName}"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-gray-700 mb-2 font-medium">举办学校</label>
+                                    <input type="text" id="schoolName" value="${settings.schoolName}"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-gray-700 mb-2 font-medium">举办日期</label>
+                                    <input type="date" id="meetDate" value="${settings.meetDate}"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-gray-700 mb-2 font-medium">举办地点</label>
+                                    <input type="text" id="location" value="${settings.location}"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                                </div>
+                                <button type="submit"
+                                    class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg transition">
+                                    保存设置
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- 数据管理 -->
+                        <div class="bg-white rounded-xl shadow-md p-6 mt-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">数据管理</h3>
+                            <div class="flex space-x-4">
+                                <button onclick="App.exportData()"
+                                    class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition flex items-center">
+                                    <i class="fas fa-download mr-2"></i>导出数据
+                                </button>
+                                <button onclick="App.clearAllData()"
+                                    class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg transition flex items-center">
+                                    <i class="fas fa-trash mr-2"></i>清空所有数据
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        };
+
+        // ============================================
+        // 应用逻辑
+        // ============================================
+        const App = {
+            init() {
+                Storage.init();
+                this.render();
+                this.attachEventListeners();
+            },
+
+            render() {
+                const app = document.getElementById('app');
+                
+                if (AppState.currentView === 'login') {
+                    app.innerHTML = Components.LoginPage();
+                } else if (AppState.currentUser) {
+                    let content = '';
+                    switch (AppState.currentView) {
+                        case 'dashboard':
+                            content = Components.DashboardPage();
+                            break;
+                        case 'registrations':
+                            content = Components.RegistrationsPage();
+                            break;
+                        case 'schedules':
+                            content = Components.SchedulesPage();
+                            break;
+                        case 'results':
+                            content = Components.ResultsPage();
+                            break;
+                        case 'certificates':
+                            content = Components.CertificatesPage();
+                            break;
+                        case 'statistics':
+                            content = Components.StatisticsPage();
+                            break;
+                        case 'users':
+                            content = Components.UsersPage();
+                            break;
+                        case 'settings':
+                            content = Components.SettingsPage();
+                            break;
+                        default:
+                            content = Components.DashboardPage();
+                    }
+                    app.innerHTML = Components.Layout(content);
+                }
+                
+                this.attachEventListeners();
+            },
+
+            attachEventListeners() {
+                // 登录表单
+                const loginForm = document.getElementById('loginForm');
+                if (loginForm) {
+                    loginForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        const username = document.getElementById('username').value;
+                        const password = document.getElementById('password').value;
+                        if (AppState.login(username, password)) {
+                            Utils.showToast('登录成功！');
+                        } else {
+                            Utils.showToast('用户名或密码错误！', 'error');
+                        }
+                    });
+                }
+
+                // 设置表单
+                const settingsForm = document.getElementById('settingsForm');
+                if (settingsForm) {
+                    settingsForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        const settings = {
+                            meetName: document.getElementById('meetName').value,
+                            schoolName: document.getElementById('schoolName').value,
+                            meetDate: document.getElementById('meetDate').value,
+                            location: document.getElementById('location').value,
+                            status: 'preparing'
+                        };
+                        Storage.set(Storage.KEYS.SETTINGS, settings);
+                        Utils.showToast('设置已保存！');
+                        this.render();
+                    });
+                }
+            },
+
+            // 报名相关
+            showAddRegistrationModal() {
+                const users = Storage.get(Storage.KEYS.USERS);
+                const events = Storage.get(Storage.KEYS.EVENTS);
+                const studentUsers = users.filter(u => u.role === 'student');
+                
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-xl p-6 w-full max-w-md animate-fade-in">
+                        <h3 class="text-xl font-bold mb-4">新增报名</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-gray-700 mb-2">选择学生</label>
+                                <select id="regStudent" class="w-full px-4 py-2 border rounded-lg">
+                                    ${studentUsers.map(s => `<option value="${s.studentId}">${s.name} - ${s.className}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">选择项目</label>
+                                <select id="regEvent" class="w-full px-4 py-2 border rounded-lg">
+                                    ${events.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="flex space-x-4 mt-6">
+                                <button onclick="this.closest('.fixed').remove()" class="flex-1 bg-gray-300 hover:bg-gray-400 py-2 rounded-lg">取消</button>
+                                <button onclick="App.addRegistration()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg">提交</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            },
+
+            addRegistration() {
+                const studentId = document.getElementById('regStudent').value;
+                const eventId = parseInt(document.getElementById('regEvent').value);
+                const registrations = Storage.get(Storage.KEYS.REGISTRATIONS);
+                
+                // 检查是否已报名
+                if (registrations.find(r => r.studentId === studentId && r.eventId === eventId)) {
+                    Utils.showToast('该学生已报名此项目！', 'error');
+                    return;
+                }
+                
+                registrations.push({
+                    id: Utils.generateId(),
+                    studentId,
+                    eventId,
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                });
+                
+                Storage.set(Storage.KEYS.REGISTRATIONS, registrations);
+                document.querySelector('.fixed').remove();
+                Utils.showToast('报名成功！');
+                this.render();
+            },
+
+            approveRegistration(id) {
+                const registrations = Storage.get(Storage.KEYS.REGISTRATIONS);
+                const reg = registrations.find(r => r.id === id);
+                if (reg) {
+                    reg.status = 'approved';
+                    Storage.set(Storage.KEYS.REGISTRATIONS, registrations);
+                    Utils.showToast('已通过审核！');
+                    this.render();
+                }
+            },
+
+            rejectRegistration(id) {
+                const registrations = Storage.get(Storage.KEYS.REGISTRATIONS);
+                const reg = registrations.find(r => r.id === id);
+                if (reg) {
+                    reg.status = 'rejected';
+                    Storage.set(Storage.KEYS.REGISTRATIONS, registrations);
+                    Utils.showToast('已拒绝！');
+                    this.render();
+                }
+            },
+
+            deleteRegistration(id) {
+                if (!confirm('确定要删除这条报名记录吗？')) return;
+                const registrations = Storage.get(Storage.KEYS.REGISTRATIONS).filter(r => r.id !== id);
+                Storage.set(Storage.KEYS.REGISTRATIONS, registrations);
+                Utils.showToast('已删除！');
+                this.render();
+            },
+
+            // 赛程相关
+            showAddScheduleModal() {
+                const events = Storage.get(Storage.KEYS.EVENTS);
+                
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-xl p-6 w-full max-w-md animate-fade-in">
+                        <h3 class="text-xl font-bold mb-4">新增赛程</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-gray-700 mb-2">选择项目</label>
+                                <select id="schedEvent" class="w-full px-4 py-2 border rounded-lg">
+                                    ${events.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">日期</label>
+                                <input type="date" id="schedDate" class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">时间</label>
+                                <input type="time" id="schedTime" class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">地点</label>
+                                <input type="text" id="schedLocation" placeholder="如：主跑道" class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div class="flex space-x-4 mt-6">
+                                <button onclick="this.closest('.fixed').remove()" class="flex-1 bg-gray-300 hover:bg-gray-400 py-2 rounded-lg">取消</button>
+                                <button onclick="App.addSchedule()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg">提交</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            },
+
+            addSchedule() {
+                const eventId = parseInt(document.getElementById('schedEvent').value);
+                const date = document.getElementById('schedDate').value;
+                const time = document.getElementById('schedTime').value;
+                const location = document.getElementById('schedLocation').value;
+                const schedules = Storage.get(Storage.KEYS.SCHEDULES);
+                
+                schedules.push({
+                    id: Utils.generateId(),
+                    eventId,
+                    date,
+                    time,
+                    location,
+                    status: 'scheduled'
+                });
+                
+                Storage.set(Storage.KEYS.SCHEDULES, schedules);
+                document.querySelector('.fixed').remove();
+                Utils.showToast('赛程已添加！');
+                this.render();
+            },
+
+            completeSchedule(id) {
+                const schedules = Storage.get(Storage.KEYS.SCHEDULES);
+                const schedule = schedules.find(s => s.id === id);
+                if (schedule) {
+                    schedule.status = 'completed';
+                    Storage.set(Storage.KEYS.SCHEDULES, schedules);
+                    Utils.showToast('比赛已完成！');
+                    this.render();
+                }
+            },
+
+            deleteSchedule(id) {
+                if (!confirm('确定要删除这个赛程吗？')) return;
+                const schedules = Storage.get(Storage.KEYS.SCHEDULES).filter(s => s.id !== id);
+                Storage.set(Storage.KEYS.SCHEDULES, schedules);
+                Utils.showToast('已删除！');
+                this.render();
+            },
+
+            // 成绩相关
+            showAddResultModal() {
+                const users = Storage.get(Storage.KEYS.USERS);
+                const events = Storage.get(Storage.KEYS.EVENTS);
+                const studentUsers = users.filter(u => u.role === 'student');
+                
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-xl p-6 w-full max-w-md animate-fade-in">
+                        <h3 class="text-xl font-bold mb-4">录入成绩</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-gray-700 mb-2">选择学生</label>
+                                <select id="resStudent" class="w-full px-4 py-2 border rounded-lg">
+                                    ${studentUsers.map(s => `<option value="${s.studentId}">${s.name} - ${s.className}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">选择项目</label>
+                                <select id="resEvent" class="w-full px-4 py-2 border rounded-lg">
+                                    ${events.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">排名</label>
+                                <input type="number" id="resRank" min="1" max="10" class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">成绩</label>
+                                <input type="text" id="resScore" placeholder="如：10.5秒" class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div class="flex space-x-4 mt-6">
+                                <button onclick="this.closest('.fixed').remove()" class="flex-1 bg-gray-300 hover:bg-gray-400 py-2 rounded-lg">取消</button>
+                                <button onclick="App.addResult()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg">提交</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            },
+
+            addResult() {
+                const studentId = document.getElementById('resStudent').value;
+                const eventId = parseInt(document.getElementById('resEvent').value);
+                const rank = parseInt(document.getElementById('resRank').value);
+                const score = document.getElementById('resScore').value;
+                const results = Storage.get(Storage.KEYS.RESULTS);
+                
+                // 计算积分
+                const points = rank === 1 ? 10 : rank === 2 ? 7 : rank === 3 ? 5 : rank <= 6 ? 3 : rank <= 8 ? 1 : 0;
+                
+                results.push({
+                    id: Utils.generateId(),
+                    studentId,
+                    eventId,
+                    rank,
+                    score,
+                    points,
+                    createdAt: new Date().toISOString()
+                });
+                
+                Storage.set(Storage.KEYS.RESULTS, results);
+                document.querySelector('.fixed').remove();
+                Utils.showToast('成绩已录入！');
+                this.render();
+            },
+
+            deleteResult(id) {
+                if (!confirm('确定要删除这条成绩吗？')) return;
+                const results = Storage.get(Storage.KEYS.RESULTS).filter(r => r.id !== id);
+                Storage.set(Storage.KEYS.RESULTS, results);
+                Utils.showToast('已删除！');
+                this.render();
+            },
+
+            // 奖状相关
+            previewCertificate(id) {
+                const results = Storage.get(Storage.KEYS.RESULTS);
+                const users = Storage.get(Storage.KEYS.USERS);
+                const events = Storage.get(Storage.KEYS.EVENTS);
+                const settings = Storage.get(Storage.KEYS.SETTINGS);
+                
+                const result = results.find(r => r.id === id);
+                const student = users.find(u => u.studentId === result.studentId);
+                const event = events.find(e => e.id === result.eventId);
+                const awardName = result.rank === 1 ? '一等奖' : result.rank === 2 ? '二等奖' : '三等奖';
+                
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-xl p-8 w-full max-w-2xl animate-fade-in text-center">
+                        <div class="border-8 border-yellow-500 p-8">
+                            <h1 class="text-4xl font-bold text-yellow-600 mb-4">荣誉证书</h1>
+                            <p class="text-gray-600 mb-6">${settings.meetName}</p>
+                            <p class="text-lg text-gray-700 mb-4">兹证明：</p>
+                            <p class="text-3xl font-bold text-gray-900 mb-6">${student.name}</p>
+                            <p class="text-gray-600 mb-4">在 ${event.name} 比赛中</p>
+                            <p class="text-2xl font-bold text-purple-600 mb-6">荣获 ${awardName}</p>
+                            <div class="flex justify-between items-end mt-8">
+                                <div>
+                                    <p class="text-gray-600">颁发单位</p>
+                                    <p class="font-bold">${settings.schoolName}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600">颁发日期</p>
+                                    <p class="font-bold">${Utils.formatDate(new Date())}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="this.closest('.fixed').remove()" class="mt-4 bg-gray-300 hover:bg-gray-400 px-6 py-2 rounded-lg">关闭</button>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            },
+
+            printCertificate(id) {
+                alert('打印功能需要在本地浏览器中使用 window.print() 方法');
+            },
+
+            generateAllCertificates() {
+                const results = Storage.get(Storage.KEYS.RESULTS).filter(r => r.rank <= 3);
+                if (results.length === 0) {
+                    Utils.showToast('暂无获奖记录！', 'error');
+                    return;
+                }
+                Utils.showToast(`已生成 ${results.length} 张奖状！`);
+            },
+
+            // 用户管理
+            showAddUserModal() {
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-xl p-6 w-full max-w-md animate-fade-in">
+                        <h3 class="text-xl font-bold mb-4">添加用户</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-gray-700 mb-2">用户名</label>
+                                <input type="text" id="newUsername" class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">密码</label>
+                                <input type="password" id="newPassword" class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">姓名</label>
+                                <input type="text" id="newName" class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">角色</label>
+                                <select id="newRole" class="w-full px-4 py-2 border rounded-lg">
+                                    <option value="student">学生</option>
+                                    <option value="teacher">老师</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">班级</label>
+                                <input type="text" id="newClassName" class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div class="flex space-x-4 mt-6">
+                                <button onclick="this.closest('.fixed').remove()" class="flex-1 bg-gray-300 hover:bg-gray-400 py-2 rounded-lg">取消</button>
+                                <button onclick="App.addUser()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg">提交</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            },
+
+            addUser() {
+                const username = document.getElementById('newUsername').value;
+                const password = document.getElementById('newPassword').value;
+                const name = document.getElementById('newName').value;
+                const role = document.getElementById('newRole').value;
+                const className = document.getElementById('newClassName').value;
+                const users = Storage.get(Storage.KEYS.USERS);
+                
+                users.push({
+                    id: Utils.generateId(),
+                    username,
+                    password,
+                    name,
+                    role,
+                    className,
+                    studentId: role === 'student' ? 'S' + (users.filter(u => u.role === 'student').length + 1) : null
+                });
+                
+                Storage.set(Storage.KEYS.USERS, users);
+                document.querySelector('.fixed').remove();
+                Utils.showToast('用户已添加！');
+                this.render();
+            },
+
+            deleteUser(id) {
+                if (!confirm('确定要删除这个用户吗？')) return;
+                const users = Storage.get(Storage.KEYS.USERS).filter(u => u.id !== id);
+                Storage.set(Storage.KEYS.USERS, users);
+                Utils.showToast('已删除！');
+                this.render();
+            },
+
+            // 数据管理
+            exportData() {
+                const data = {
+                    users: Storage.get(Storage.KEYS.USERS),
+                    events: Storage.get(Storage.KEYS.EVENTS),
+                    registrations: Storage.get(Storage.KEYS.REGISTRATIONS),
+                    schedules: Storage.get(Storage.KEYS.SCHEDULES),
+                    results: Storage.get(Storage.KEYS.RESULTS),
+                    settings: Storage.get(Storage.KEYS.SETTINGS),
+                    exportDate: new Date().toISOString()
+                };
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `田径运动会数据备份_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                Utils.showToast('数据已导出！');
+            },
+
+            clearAllData() {
+                if (!confirm('⚠️ 警告：此操作将清空所有数据且无法恢复！确定要继续吗？')) return;
+                localStorage.clear();
+                Storage.init();
+                Utils.showToast('所有数据已清空！');
+                this.render();
+            }
+        };
+
+        // 启动应用
+        App.init();
+    </script>
+</body>
+</html>
